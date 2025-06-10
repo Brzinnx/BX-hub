@@ -1,0 +1,136 @@
+-- // INICIALIZAÇÃO
+local player = game.Players.LocalPlayer
+local rs = game:GetService("RunService")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+-- // LUGARES E OBJETOS
+local baseDoor = workspace:FindFirstChild("BaseDoor_" .. player.Name)
+local moneyCollector = workspace:FindFirstChild("MoneyCollector_" .. player.Name)
+local teleportBasePosition = workspace:FindFirstChild("BaseTeleport_" .. player.Name).Position
+local brainrots = workspace:FindFirstChild("Brainrots")
+local brainrotShop = workspace:FindFirstChild("BrainrotShop")
+local myBase = workspace:FindFirstChild("MinhaBase_" .. player.Name)
+
+-- // LÍDERSTATS
+local leaderstats = player:WaitForChild("leaderstats")
+local moneyStat = leaderstats:FindFirstChild("Money")
+
+-- // CONFIGURAÇÕES
+local brainrotPrice = 100
+local desiredBrainrots = {
+	"Brainrot Lendário",
+	"Brainrot Roxo",
+	"Brainrot Comum"
+}
+
+-- // 1. AUTO BLOQUEAR BASE
+local function autoBlockBase()
+	if baseDoor then
+		baseDoor.CanCollide = true
+		baseDoor.Transparency = 0
+	end
+end
+
+-- // 2. AUTO COLETAR DINHEIRO
+local function autoCollectMoney()
+	if moneyCollector then
+		firetouchinterest(hrp, moneyCollector, 0)
+		wait(0.1)
+		firetouchinterest(hrp, moneyCollector, 1)
+	end
+end
+
+-- // 3. AUTO COMPRAR BRAINROT
+local function autoBuy()
+	if not (brainrotShop and moneyStat) then return end
+	local dist = (hrp.Position - brainrotShop.Position).Magnitude
+	if dist <= 10 and moneyStat.Value >= brainrotPrice then
+		local clickDet = brainrotShop:FindFirstChildOfClass("ClickDetector")
+		if clickDet then
+			fireclickdetector(clickDet)
+			moneyStat.Value = moneyStat.Value - brainrotPrice
+			print("Comprou um Brainrot por $" .. brainrotPrice)
+		end
+	end
+end
+
+-- // 4. CLICAR NO BRAINROT PARA ROUBAR MANUALMENTE
+local function handleBrainrotClick(brainrot)
+	if not brainrot:IsA("Model") then return end
+	local clickDetector = brainrot:FindFirstChildOfClass("ClickDetector")
+	if not clickDetector then return end
+
+	clickDetector.MouseClick:Connect(function()
+		print("Você clicou no Brainrot manualmente!")
+		brainrot.Parent = char
+		brainrot:SetPrimaryPartCFrame(hrp.CFrame * CFrame.new(0, 2, 2))
+
+		wait(3)
+		char:MoveTo(teleportBasePosition)
+
+		wait(0.5)
+		if myBase then
+			brainrot.Parent = myBase
+			brainrot:SetPrimaryPartCFrame(CFrame.new(teleportBasePosition + Vector3.new(2, 1, 0)))
+			print("Brainrot enviado pra sua base.")
+		end
+	end)
+end
+
+-- Conectar todos os brainrots existentes
+if brainrots then
+	for _, brainrot in pairs(brainrots:GetChildren()) do
+		handleBrainrotClick(brainrot)
+	end
+	brainrots.ChildAdded:Connect(handleBrainrotClick)
+end
+
+-- // 5. AUTO ROUBAR BRAINROT DE OUTRO JOGADOR SE ELE TIVER
+local function findBrainrotInPlayers()
+	for _, otherPlayer in pairs(game.Players:GetPlayers()) do
+		if otherPlayer ~= player then
+			local char = otherPlayer.Character
+			if char then
+				local folder = char:FindFirstChild("Brainrots") or workspace:FindFirstChild("Brainrots_" .. otherPlayer.Name)
+				if folder then
+					for _, brainrot in pairs(folder:GetChildren()) do
+						if table.find(desiredBrainrots, brainrot.Name) then
+							return brainrot
+						end
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function tryToStealDesiredBrainrot()
+	local brainrot = findBrainrotInPlayers()
+	if brainrot then
+		print("Roubando Brainrot: " .. brainrot.Name)
+
+		-- Simula roubo
+		brainrot.Parent = char
+		brainrot:SetPrimaryPartCFrame(hrp.CFrame * CFrame.new(0, 2, 2))
+		wait(3)
+
+		char:MoveTo(teleportBasePosition)
+		wait(0.5)
+		if myBase then
+			brainrot.Parent = myBase
+			brainrot:SetPrimaryPartCFrame(CFrame.new(teleportBasePosition + Vector3.new(2, 1, 0)))
+			print("Brainrot raro roubado com sucesso!")
+		end
+	end
+end
+
+-- // LOOP PRINCIPAL
+rs.RenderStepped:Connect(function()
+	autoBlockBase()
+	autoCollectMoney()
+	autoBuy()
+	tryToStealDesiredBrainrot()
+end)
